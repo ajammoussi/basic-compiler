@@ -1,0 +1,14 @@
+int score;
+string grade;
+
+score = 85;
+
+if score > 90 then {
+    grade = "A";
+} else {
+    if score > 80 then {
+        grade = "B";
+    } else {
+        grade = "C";
+    }
+}

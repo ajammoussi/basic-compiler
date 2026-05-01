@@ -1,0 +1,6 @@
+string greeting;
+string name;
+string message;
+
+greeting = "hello";
+name = "world";

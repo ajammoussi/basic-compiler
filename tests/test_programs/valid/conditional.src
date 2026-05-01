@@ -1,0 +1,12 @@
+int x;
+int a;
+int b;
+
+a = 10;
+b = 5;
+
+if a > b then {
+    x = a - b;
+} else {
+    x = b - a;
+}

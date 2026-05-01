@@ -1,0 +1,10 @@
+int x;
+int y;
+int sum;
+int product;
+
+x = 10;
+y = 5;
+
+sum = x + y;
+product = x * y;
