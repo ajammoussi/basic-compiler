@@ -28,9 +28,11 @@ basic-compiler/
 │       └── invalid/          # Invalid programs for error testing
 ├── examples/
 │   ├── calculator.src
-│   └── conditional_logic.src
+│   ├── conditional_logic.src
+│   └── while_loop.src
 ├── docs/
 │   ├── grammar.md
+│   ├── gui_documentation.md
 │   └── language_spec.md
 ├── requirements.txt
 ├── main.py                   # Main entry point (launches GUI)
@@ -66,7 +68,7 @@ The GUI provides:
 - **Data Types**: `int`, `string`
 - **Arithmetic**: `+`, `-`, `*`, `/`
 - **Comparison**: `>`, `<`, `=`
-- **Control Flow**: `if-then-else`
+- **Control Flow**: `if-then-else`, `while` loops
 - **Variable Declarations**: `int x;`, `string name;`
 
 ## Example Code

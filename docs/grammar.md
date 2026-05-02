@@ -8,7 +8,7 @@ The language supports:
 - Arithmetic expressions (+, -, *, /)
 - Comparison operators (>, <, =)
 - If-then-else control flow
-- While loops (optional)
+- While loops
 
 ## Grammar Rules
 
@@ -51,4 +51,13 @@ if x > 3 then {
 ```
 int result;
 result = a * (b + c) - d / 2;
+```
+
+### While Loop
+```
+int x;
+x = 10;
+while x > 0 {
+    x = x - 1;
+}
 ```
