@@ -96,16 +96,16 @@ The Basic Compiler GUI is an interactive PyQt5 application that provides visual 
 ### 5. Example Templates
 
 **Available Examples**:
-- Basic Assignment: Simple variable assignment
+- Basic assignment: Simple variable assignment
 - Arithmetic: Complex arithmetic expressions
-- Conditional: If-then-else statements
-- String Operations: String concatenation
-- PDF Example 1: `x = 5 + 2;`
-- PDF Example 2: `z = x * (y - 3);`
-- PDF Example 3: `if a = b then a = a + 1; else b = b - 1;`
-- Type Mismatch Error: Demonstrates type checking
-- Undeclared Variable Error: Demonstrates scope checking
-- String Concatenation: Demonstrates string + string
+- If-else (braces): Conditional logic with blocks
+- Inline if-else: Conditional logic without blocks
+- While loop: Iterative loop visualization
+- String operations: Basic string variable handling
+- String concatenation: Demonstrates "string + string"
+- Type mismatch error: Demonstrates type checking (int vs string)
+- Undeclared variable: Demonstrates scope checking
+- Duplicate declaration: Demonstrates error handling for re-declared variables
 
 **How to Use**:
 1. Select an example from the dropdown

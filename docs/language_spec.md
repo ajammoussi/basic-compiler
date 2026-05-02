@@ -65,4 +65,13 @@ A simple educational compiler for a custom programming language supporting basic
 
 ## Example Programs
 
-See `examples/` directory for sample programs.
+### Basic While Loop
+```
+int x;
+x = 5;
+while x > 0 {
+    x = x - 1;
+}
+```
+
+See `examples/` directory for more sample programs.

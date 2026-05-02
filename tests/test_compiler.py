@@ -161,6 +161,15 @@ class TestParser:
         assert type(stmt).__name__ == 'IfStatement'
         assert stmt.condition.operator == '>'
 
+    def test_while_statement(self):
+        code = 'while x > 0 { x = x - 1; }'
+        tokens = tokenize(code)
+        ast = parse(tokens)
+        stmt = ast.statements[0]
+        assert type(stmt).__name__ == 'WhileStatement'
+        assert stmt.condition.operator == '>'
+        assert len(stmt.body) == 1
+
 
 class TestSemanticAnalyzer:
     def test_undeclared_variable_error(self):
@@ -246,6 +255,12 @@ class TestCompiler:
 
     def test_pdf_control_structure(self):
         code = 'int x;\nx = 15;\nif x > 10 then {\nx = x - 1;\n}'
+        ast, errors = compile_source(code)
+        assert ast is not None
+        assert len(errors) == 0
+
+    def test_while_compilation(self):
+        code = 'int x;\nx = 10;\nwhile x > 0 {\nx = x - 1;\n}'
         ast, errors = compile_source(code)
         assert ast is not None
         assert len(errors) == 0
