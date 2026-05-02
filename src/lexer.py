@@ -40,7 +40,7 @@ KEYWORDS = {
 
 
 class Token:
-    def __init__(self, token_type, value, line=1, column=0):
+    def __init__(self, token_type, value, line=1, column=1):
         self.type = token_type
         self.value = value
         self.line = line
@@ -62,52 +62,55 @@ class Token:
 
 class Lexer:
     TOKEN_PATTERNS = [
-        (r'int\b', TokenType.KW_INT),
-        (r'string\b', TokenType.KW_STRING),
-        (r'if\b', TokenType.KW_IF),
-        (r'then\b', TokenType.KW_THEN),
-        (r'else\b', TokenType.KW_ELSE),
-        (r'while\b', TokenType.KW_WHILE),
-        (r'[a-zA-Z_][a-zA-Z0-9_]*', TokenType.IDENTIFIER),
-        (r'\d+', TokenType.NUMBER),
-        (r'"[^"]*"', TokenType.STRING_LITERAL),
-        (r'\+', TokenType.PLUS),
-        (r'-', TokenType.MINUS),
-        (r'=', TokenType.EQUALS),
-        (r'>', TokenType.GREATER),
-        (r'<', TokenType.LESS),
-        (r'\*', TokenType.MULTIPLY),
-        (r'/', TokenType.DIVIDE),
-        (r'\(', TokenType.LPAREN),
-        (r'\)', TokenType.RPAREN),
-        (r'\{', TokenType.LBRACE),
-        (r'\}', TokenType.RBRACE),
-        (r';', TokenType.SEMICOLON),
-        (r'[ \t\r\n]+', None),
+        (r'int\b',                      TokenType.KW_INT),
+        (r'string\b',                   TokenType.KW_STRING),
+        (r'if\b',                       TokenType.KW_IF),
+        (r'then\b',                     TokenType.KW_THEN),
+        (r'else\b',                     TokenType.KW_ELSE),
+        (r'while\b',                    TokenType.KW_WHILE),
+        (r'[a-zA-Z_][a-zA-Z0-9_]*',    TokenType.IDENTIFIER),
+        (r'\d+',                        TokenType.NUMBER),
+        (r'"[^"]*"',                    TokenType.STRING_LITERAL),
+        (r'\+',                         TokenType.PLUS),
+        (r'-',                          TokenType.MINUS),
+        (r'=',                          TokenType.EQUALS),
+        (r'>',                          TokenType.GREATER),
+        (r'<',                          TokenType.LESS),
+        (r'\*',                         TokenType.MULTIPLY),
+        (r'/',                          TokenType.DIVIDE),
+        (r'\(',                         TokenType.LPAREN),
+        (r'\)',                         TokenType.RPAREN),
+        (r'\{',                         TokenType.LBRACE),
+        (r'\}',                         TokenType.RBRACE),
+        (r';',                          TokenType.SEMICOLON),
+        (r'[ \t\r\n]+',                 None),  # whitespace — skip
     ]
+
+    # Pre-compile all patterns once at class level for performance
+    _compiled = [(re.compile(p), t) for p, t in TOKEN_PATTERNS]
 
     def __init__(self, source_code, error_handler=None):
         self.source = source_code
         self.pos = 0
         self.line = 1
-        self.column = 0
+        self.column = 1          # FIX: start at 1, not 0
         self.tokens = []
         self.error_handler = error_handler
 
     def tokenize(self):
         self.pos = 0
         self.line = 1
-        self.column = 0
+        self.column = 1
         self.tokens = []
 
         while self.pos < len(self.source):
             matched = False
-            for pattern, token_type in self.TOKEN_PATTERNS:
-                regex = re.compile(pattern)
+            for regex, token_type in self._compiled:
                 match = regex.match(self.source, self.pos)
                 if match:
                     token_text = match.group(0)
                     if token_type is not None:
+                        # Re-classify plain identifiers that are keywords
                         if token_type == TokenType.IDENTIFIER and token_text in KEYWORDS:
                             token_type = KEYWORDS[token_text]
                         token = Token(token_type, token_text, self.line, self.column)
@@ -122,16 +125,17 @@ class Lexer:
                         f"Unexpected character: {self.source[self.pos]!r}",
                         self.line, self.column
                     )
-                self._advance(1)
+                self._advance(self.source[self.pos])
 
         self.tokens.append(Token(TokenType.EOF, '', self.line, self.column))
         return self.tokens
 
     def _advance(self, text):
+        """Move position forward, updating line and column counters."""
         for char in text:
             if char == '\n':
                 self.line += 1
-                self.column = 0
+                self.column = 1          # reset to 1 at start of new line
             else:
                 self.column += 1
         self.pos += len(text)

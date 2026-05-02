@@ -13,6 +13,8 @@ class Parser:
         self.pos = 0
         self.error_handler = error_handler
 
+    # ------------------------------------------------------------------ helpers
+
     def current_token(self):
         if self.pos < len(self.tokens):
             return self.tokens[self.pos]
@@ -32,7 +34,7 @@ class Parser:
     def expect(self, token_type):
         token = self.current_token()
         if token is None or token.type != token_type:
-            if self.error_handler:
+            if self.error_handler:                    # FIX: guard added
                 expected_name = token_type.name if isinstance(token_type, TokenType) else str(token_type)
                 actual = token.type.name if token else "EOF"
                 self.error_handler.add_parser_error(
@@ -48,16 +50,23 @@ class Parser:
             return self.advance()
         return None
 
+    def _report_error(self, message, token=None):
+        """Centralised error reporting — safe to call when error_handler is None."""
+        if self.error_handler:
+            line = token.line if token else None
+            col  = token.column if token else None
+            self.error_handler.add_parser_error(message, line, col)
+
+    # ------------------------------------------------------------------ entry
+
     def parse(self):
         program = self.parse_program()
-        if self.current_token() and self.current_token().type != TokenType.EOF:
-            if self.error_handler:
-                self.error_handler.add_parser_error(
-                    f"Unexpected token: {self.current_token().type.name}",
-                    self.current_token().line,
-                    self.current_token().column
-                )
+        tok = self.current_token()
+        if tok and tok.type != TokenType.EOF:
+            self._report_error(f"Unexpected token: {tok.type.name}", tok)
         return program
+
+    # ------------------------------------------------------------------ grammar
 
     def parse_program(self):
         statements = []
@@ -72,7 +81,7 @@ class Parser:
         if token is None:
             return None
 
-        if token.type == TokenType.KW_INT or token.type == TokenType.KW_STRING:
+        if token.type in (TokenType.KW_INT, TokenType.KW_STRING):
             return self.parse_declaration()
         elif token.type == TokenType.KW_IF:
             return self.parse_if_statement()
@@ -83,10 +92,7 @@ class Parser:
         elif token.type == TokenType.LBRACE:
             return self.parse_block()
         else:
-            self.error_handler.add_parser_error(
-                f"Unexpected token: {token.type.name}",
-                token.line, token.column
-            )
+            self._report_error(f"Unexpected token: {token.type.name}", token)   # FIX: use helper
             self.advance()
             return None
 
@@ -126,6 +132,7 @@ class Parser:
         if condition is None:
             return None
         self.expect(TokenType.KW_THEN)
+
         if self.current_token() and self.current_token().type == TokenType.LBRACE:
             self.expect(TokenType.LBRACE)
             then_block = self.parse_statement_list()
@@ -133,6 +140,7 @@ class Parser:
         else:
             stmt = self.parse_statement()
             then_block = [stmt] if stmt else []
+
         else_block = None
         if self.match(TokenType.KW_ELSE):
             if self.current_token() and self.current_token().type == TokenType.LBRACE:
@@ -142,6 +150,7 @@ class Parser:
             else:
                 stmt = self.parse_statement()
                 else_block = [stmt] if stmt else []
+
         return IfStatement(condition, then_block, else_block, if_token.line, if_token.column)
 
     def parse_while_statement(self):
@@ -160,7 +169,9 @@ class Parser:
         self.expect(TokenType.LBRACE)
         statements = self.parse_statement_list()
         self.expect(TokenType.RBRACE)
-        return Program(statements, lbrace.line, lbrace.column) if statements else EmptyStatement()
+        if statements:
+            return Program(statements, lbrace.line, lbrace.column)
+        return EmptyStatement()
 
     def parse_statement_list(self):
         statements = []
@@ -171,6 +182,8 @@ class Parser:
             if stmt:
                 statements.append(stmt)
         return statements
+
+    # ------------------------------------------------------------------ expressions
 
     def parse_expression(self):
         return self.parse_comparison()
@@ -227,14 +240,13 @@ class Parser:
             self.advance()
             return StringLiteral(token.value, token.line, token.column)
         elif token.type == TokenType.LPAREN:
-            lparen = self.advance()
+            self.advance()
             expr = self.parse_expression()
             self.expect(TokenType.RPAREN)
             return expr
         else:
-            self.error_handler.add_parser_error(
-                f"Unexpected token in expression: {token.type.name}",
-                token.line, token.column
+            self._report_error(                          # FIX: use helper
+                f"Unexpected token in expression: {token.type.name}", token
             )
             self.advance()
             return None

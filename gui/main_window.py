@@ -1,8 +1,10 @@
 import sys
 import os
 
-from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout,
-                             QWidget, QLabel, QHBoxLayout, QComboBox)
+from PyQt5.QtWidgets import (
+    QMainWindow, QTabWidget, QVBoxLayout,
+    QWidget, QLabel, QHBoxLayout, QComboBox, QStatusBar
+)
 from PyQt5.QtCore import Qt
 
 from gui.tabs.lexer_tab import LexerTab
@@ -10,10 +12,11 @@ from gui.tabs.parser_tab import ParserTab
 from gui.tabs.semantic_tab import SemanticAnalyzerTab
 from gui.tabs.pipeline_tab import PipelineTab
 
+
 class CompilerGUI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Basic Compiler - Interactive GUI")
+        self.setWindowTitle("Basic Compiler — Interactive GUI")
         self.setGeometry(100, 100, 1400, 900)
         self.setStyleSheet("""
             QMainWindow {
@@ -38,6 +41,9 @@ class CompilerGUI(QMainWindow):
             QTabBar::tab:selected {
                 background-color: #0078d4;
                 color: white;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #3c3c3c;
             }
             QGroupBox {
                 color: #ffffff;
@@ -70,14 +76,9 @@ class CompilerGUI(QMainWindow):
             QPushButton:pressed {
                 background-color: #005a9e;
             }
-            QMessageBox {
-                background-color: #1e1e1e;
-            }
-            QMessageBox QLabel {
-                color: #d4d4d4;
-            }
-            QMessageBox QPushButton {
-                min-width: 80px;
+            QPushButton:disabled {
+                background-color: #3c3c3c;
+                color: #888888;
             }
             QAbstractItemView {
                 background-color: #1e1e1e;
@@ -95,20 +96,36 @@ class CompilerGUI(QMainWindow):
                 border: none;
                 border-bottom: 1px solid #3c3c3c;
             }
+            QScrollBar:vertical {
+                background: #2d2d2d;
+                width: 10px;
+            }
+            QScrollBar::handle:vertical {
+                background: #555555;
+                border-radius: 5px;
+            }
+            QStatusBar {
+                background-color: #007acc;
+                color: #ffffff;
+                font-size: 12px;
+            }
         """)
 
+        self._all_tabs: list = []
         self.setup_ui()
+
+    # ------------------------------------------------------------------ UI
 
     def setup_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
 
-        self.main_layout = QVBoxLayout(central_widget)
-
-        header = QLabel("Basic Compiler - Interactive Visualization")
+        # Header
+        header = QLabel("Basic Compiler — Interactive Visualization")
         header.setStyleSheet("""
             QLabel {
-                font-size: 24px;
+                font-size: 22px;
                 font-weight: bold;
                 color: #ffffff;
                 padding: 10px;
@@ -117,75 +134,92 @@ class CompilerGUI(QMainWindow):
             }
         """)
         header.setAlignment(Qt.AlignCenter)
-        self.main_layout.addWidget(header)
+        main_layout.addWidget(header)
 
+        # Example selector
+        main_layout.addLayout(self._build_example_bar())
+
+        # Tabs
         self.tabs = QTabWidget()
 
-        self.lexer_tab = LexerTab()
-        self.parser_tab = ParserTab()
+        self.lexer_tab    = LexerTab()
+        self.parser_tab   = ParserTab()
         self.semantic_tab = SemanticAnalyzerTab()
         self.pipeline_tab = PipelineTab()
 
-        self.tabs.addTab(self.lexer_tab, "Lexer")
-        self.tabs.addTab(self.parser_tab, "Parser")
-        self.tabs.addTab(self.semantic_tab, "Semantic Analyzer")
+        self._all_tabs = [
+            self.lexer_tab,
+            self.parser_tab,
+            self.semantic_tab,
+            self.pipeline_tab,
+        ]
+
+        self.tabs.addTab(self.lexer_tab,    "Lexer")
+        self.tabs.addTab(self.parser_tab,   "Parser")
+        self.tabs.addTab(self.semantic_tab, "Semantic analyzer")
         self.tabs.addTab(self.pipeline_tab, "Pipeline")
 
-        self.main_layout.addWidget(self.tabs)
+        main_layout.addWidget(self.tabs)
 
-        self.setup_examples()
+        # Status bar
+        status_bar = QStatusBar()
+        self.setStatusBar(status_bar)
+        status_bar.showMessage("Ready")
 
-    def setup_examples(self):
-        examples = {
-            "Basic Assignment": "int x;\nx = 5 + 2;",
-            "Arithmetic": "int a;\nint b;\nint result;\na = 10;\nb = 5;\nresult = a * (b + c) - d / 2;",
-            "Conditional": "int a;\nint b;\nint result;\na = 10;\nb = 5;\nif a > b then {\n    result = a - b;\n} else {\n    result = b - a;\n}",
-            "String Operations": 'string greeting;\nstring name;\nstring message;\ngreeting = "hello";\nname = "world";\nmessage = greeting + " " + name;',
-            "Simple Expression": "x = 5 + 2;",
-            "Complex Expression": "z = x * (y - 3);",
-            "Inline If-Else": "if a = b then a = a + 1; else b = b - 1;",
-            "Type Mismatch Error": 'int x;\nx = "hello";',
-            "Undeclared Variable Error": "x = 5;",
-            "String Concatenation": 'string s;\ns = "hello" + " world!";',
+    def _build_example_bar(self) -> QHBoxLayout:
+        self._examples = {
+            "Basic assignment":       "int x;\nx = 5 + 2;",
+            "Arithmetic":             "int a;\nint b;\nint result;\na = 10;\nb = 5;\nresult = a * (b + 3) - 2;",
+            "If-else (braces)":       "int a;\nint b;\nint result;\na = 10;\nb = 5;\nif a > b then {\n    result = a - b;\n} else {\n    result = b - a;\n}",
+            "Inline if-else":         "int a;\nint b;\na = 3;\nb = 7;\nif a > b then a = a + 1; else b = b - 1;",
+            "While loop":             "int x;\nx = 10;\nwhile x > 0 {\n    x = x - 1;\n}",
+            "String operations":      'string greeting;\nstring name;\ngreeting = "hello";\nname = "world";',
+            "String concatenation":   'string s;\ns = "hello" + " world!";',
+            "Type mismatch error":    'int x;\nx = "hello";',
+            "Undeclared variable":    "x = 5;",
+            "Duplicate declaration":  "int x;\nint x;",
         }
 
-        example_combo = QComboBox()
-        example_combo.addItems(["Select an example..."] + list(examples.keys()))
-        example_combo.setStyleSheet("""
+        combo = QComboBox()
+        combo.addItem("Load an example…")
+        combo.addItems(list(self._examples.keys()))
+        combo.setStyleSheet("""
             QComboBox {
                 background-color: #2d2d2d;
                 color: #d4d4d4;
                 border: 1px solid #3c3c3c;
                 padding: 5px;
                 border-radius: 4px;
+                min-width: 220px;
             }
-            QComboBox::drop-down {
-                border: none;
-            }
+            QComboBox::drop-down { border: none; }
             QComboBox QAbstractItemView {
                 background-color: #2d2d2d;
                 color: #d4d4d4;
                 selection-background-color: #0078d4;
             }
         """)
-
-        example_combo.currentTextChanged.connect(
-            lambda name: self.load_example(name, examples) if name != "Select an example..." else None
+        combo.currentTextChanged.connect(
+            lambda name: self._load_example(name) if name != "Load an example…" else None
         )
 
-        example_label = QLabel("Load Example:")
-        example_label.setStyleSheet("color: #d4d4d4; font-weight: bold;")
+        lbl = QLabel("Examples:")
+        lbl.setStyleSheet("color: #d4d4d4; font-weight: bold;")
 
-        example_layout = QHBoxLayout()
-        example_layout.addWidget(example_label)
-        example_layout.addWidget(example_combo)
-        example_layout.addStretch()
+        row = QHBoxLayout()
+        row.addWidget(lbl)
+        row.addWidget(combo)
+        row.addStretch()
+        return row
 
-        self.main_layout.insertLayout(2, example_layout)
+    # ------------------------------------------------------------------ helpers
 
-    def load_example(self, name, examples):
-        source = examples.get(name, "")
-        if source:
-            current_tab = self.tabs.currentWidget()
-            if hasattr(current_tab, 'set_source'):
-                current_tab.set_source(source)
+    def _load_example(self, name: str):
+        """Push the selected example source to ALL tabs at once (FIX)."""
+        source = self._examples.get(name, "")
+        if not source:
+            return
+        for tab in self._all_tabs:
+            if hasattr(tab, 'set_source'):
+                tab.set_source(source)
+        self.statusBar().showMessage(f"Loaded example: {name}")

@@ -1,64 +1,115 @@
 from PyQt5.QtWidgets import QTreeWidget, QTreeWidgetItem, QHeaderView
-from src.ast_nodes import ASTNode
+from PyQt5.QtGui import QColor
+from src.ast_nodes import (
+    ASTNode, Program, Declaration, Assignment, IfStatement, WhileStatement,
+    BinaryExpression, UnaryExpression, Identifier, NumberLiteral,
+    StringLiteral, EmptyStatement
+)
+
+
+# Maps each AST node class to the ordered list of child attributes to display.
+# Using an explicit whitelist avoids the double-traversal bug that appeared when
+# the widget walked both named attributes AND dir(node) simultaneously.
+_CHILD_ATTRS = {
+    Program:          ['statements'],
+    Declaration:      ['identifier'],
+    Assignment:       ['identifier', 'expression'],
+    IfStatement:      ['condition', 'then_block', 'else_block'],
+    WhileStatement:   ['condition', 'body'],
+    BinaryExpression: ['left', 'right'],
+    UnaryExpression:  ['operand'],
+    Identifier:       [],
+    NumberLiteral:    [],
+    StringLiteral:    [],
+    EmptyStatement:   [],
+}
+
+
+def _node_label(node):
+    """Return a short human-readable value string for a node."""
+    if isinstance(node, Declaration):
+        return f"type={node.var_type}"
+    if isinstance(node, Assignment):
+        return f"var={node.identifier.name}"
+    if isinstance(node, BinaryExpression):
+        return f"op='{node.operator}'"
+    if isinstance(node, UnaryExpression):
+        return f"op='{node.operator}'"
+    if isinstance(node, Identifier):
+        return f"name={node.name}"
+    if isinstance(node, NumberLiteral):
+        return f"value={node.value}"
+    if isinstance(node, StringLiteral):
+        return f'value="{node.value}"'
+    if isinstance(node, IfStatement):
+        has_else = "with else" if node.else_block else "no else"
+        return has_else
+    if isinstance(node, WhileStatement):
+        return f"body={len(node.body)} stmt(s)"
+    if isinstance(node, Program):
+        return f"{len(node.statements)} stmt(s)"
+    return ""
+
+
+# Colour-coding by node family
+_NODE_COLOURS = {
+    Program:          "#1e6b9e",   # blue
+    Declaration:      "#7c4dba",   # purple
+    Assignment:       "#1a7a4a",   # green
+    IfStatement:      "#c07a00",   # amber
+    WhileStatement:   "#b85c00",   # orange
+    BinaryExpression: "#c0392b",   # red
+    UnaryExpression:  "#a93226",
+    Identifier:       "#2e7d32",
+    NumberLiteral:    "#1565c0",
+    StringLiteral:    "#6a1b9a",
+    EmptyStatement:   "#808080",
+}
+
 
 class ParseTreeWidget(QTreeWidget):
     def __init__(self):
         super().__init__()
-        self.setHeaderLabels(["Node", "Value"])
+        self.setHeaderLabels(["Node type", "Value"])
         self.setAlternatingRowColors(True)
-        self.setStyleSheet("")
-        self.header().setSectionResizeMode(QHeaderView.Interactive)
+        self.header().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.header().setSectionResizeMode(1, QHeaderView.Interactive)
         self.header().setStretchLastSection(True)
+        self.setColumnWidth(0, 220)
+
+    # ------------------------------------------------------------------
 
     def build_tree(self, node, parent=None):
         if node is None:
             return
 
-        node_type = type(node).__name__
-        item = QTreeWidgetItem(parent)
+        node_type = type(node)
+        node_type_name = node_type.__name__
+
+        # Create the tree item
+        item = QTreeWidgetItem()
+        item.setText(0, node_type_name)
+        item.setText(1, _node_label(node))
+
+        # Apply colour
+        colour = _NODE_COLOURS.get(node_type, "#444444")
+        item.setForeground(0, QColor(colour))
 
         if parent is None:
             self.addTopLevelItem(item)
+        else:
+            parent.addChild(item)
 
-        item.setText(0, node_type)
-
-        if hasattr(node, 'var_type'):
-            item.setText(1, f"type: {node.var_type}")
-        elif hasattr(node, 'name'):
-            item.setText(1, f"name: {node.name}")
-        elif hasattr(node, 'value'):
-            item.setText(1, f"value: {node.value}")
-        elif hasattr(node, 'operator'):
-            item.setText(1, f"op: {node.operator}")
-        elif hasattr(node, 'statements'):
-            item.setText(1, f"statements: {len(node.statements)}")
-        elif hasattr(node, 'identifier'):
-            item.setText(1, f"var: {node.identifier.name}")
-        elif hasattr(node, 'expression'):
-            item.setText(1, f"expr: {type(node.expression).__name__}")
-        elif hasattr(node, 'condition'):
-            item.setText(1, f"cond: {type(node.condition).__name__}")
-        elif hasattr(node, 'then_block'):
-            item.setText(1, f"then: {len(node.then_block)} stmts")
-        elif hasattr(node, 'else_block'):
-            item.setText(1, f"else: {len(node.else_block) if node.else_block else 0} stmts")
-        elif hasattr(node, 'body'):
-            item.setText(1, f"body: {len(node.body)} stmts")
-        elif hasattr(node, 'left'):
-            item.setText(1, f"left: {type(node.left).__name__}, right: {type(node.right).__name__}")
-        elif hasattr(node, 'operand'):
-            item.setText(1, f"operand: {type(node.operand).__name__}")
-
-        for attr_name in dir(node):
-            if attr_name.startswith('_'):
+        # Recurse only over the whitelisted child attributes
+        child_attrs = _CHILD_ATTRS.get(node_type, [])
+        for attr in child_attrs:
+            value = getattr(node, attr, None)
+            if value is None:
                 continue
-            attr_value = getattr(node, attr_name)
-            if callable(attr_value):
-                continue
-            if isinstance(attr_value, ASTNode):
-                self.build_tree(attr_value, item)
-            elif isinstance(attr_value, list) and attr_value:
-                for child in attr_value:
+            if isinstance(value, ASTNode):
+                self.build_tree(value, item)
+            elif isinstance(value, list):
+                for child in value:
                     if isinstance(child, ASTNode):
                         self.build_tree(child, item)
 

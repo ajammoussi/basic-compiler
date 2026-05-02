@@ -1,49 +1,66 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QTextEdit, QHBoxLayout, QPushButton, QTreeWidget, QTreeWidgetItem, QHeaderView
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QTextEdit,
+    QPushButton, QTreeWidget, QTreeWidgetItem, QHeaderView, QLabel
+)
 from PyQt5.QtGui import QFont, QBrush, QColor
+
 from src.lexer import tokenize
 from src.parser import parse
 from src.semantic_analyzer import SemanticAnalyzer
 from src.error_handler import ErrorHandler
+from gui.syntax_highlighter import SyntaxHighlighter
+
 
 class PipelineTab(QWidget):
     def __init__(self):
         super().__init__()
+        self._highlighter = None
         self.setup_ui()
 
+    # ------------------------------------------------------------------ UI
+
     def setup_ui(self):
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(self)
 
-        source_group = QGroupBox("Source Code")
-        source_layout = QVBoxLayout()
+        # ── Source editor ─────────────────────────────────────────────────
+        source_group = QGroupBox("Source code")
+        source_layout = QVBoxLayout(source_group)
         self.source_edit = QTextEdit()
-        self.source_edit.setPlaceholderText("Enter source code here...")
+        self.source_edit.setPlaceholderText("Enter source code here…")
         self.source_edit.setFont(QFont("Consolas", 11))
-        self.source_edit.setStyleSheet("")
         source_layout.addWidget(self.source_edit)
-        source_group.setLayout(source_layout)
+        layout.addWidget(source_group)
 
-        button_layout = QHBoxLayout()
+        self._highlighter = SyntaxHighlighter(self.source_edit.document())
+
+        # ── Buttons ───────────────────────────────────────────────────────
+        btn_layout = QHBoxLayout()
         self.compile_btn = QPushButton("Compile")
-        self.compile_btn.setStyleSheet("")
         self.compile_btn.clicked.connect(self.compile)
-        button_layout.addWidget(self.compile_btn)
-        button_layout.addStretch()
+        btn_layout.addWidget(self.compile_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
 
-        pipeline_group = QGroupBox("Compilation Pipeline")
-        pipeline_layout = QVBoxLayout()
+        # ── Status banner ─────────────────────────────────────────────────
+        self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
+        self.status_label.hide()
+        layout.addWidget(self.status_label)
 
+        # ── Pipeline tree ─────────────────────────────────────────────────
+        pipeline_group = QGroupBox("Compilation pipeline")
+        pipeline_layout = QVBoxLayout(pipeline_group)
         self.pipeline_tree = QTreeWidget()
         self.pipeline_tree.setHeaderLabels(["Phase", "Status", "Details"])
         self.pipeline_tree.setAlternatingRowColors(True)
         self.pipeline_tree.header().setSectionResizeMode(QHeaderView.Interactive)
         self.pipeline_tree.header().setStretchLastSection(True)
+        self.pipeline_tree.setColumnWidth(0, 200)
+        self.pipeline_tree.setColumnWidth(1, 90)
         pipeline_layout.addWidget(self.pipeline_tree)
-        pipeline_group.setLayout(pipeline_layout)
-
-        layout.addWidget(source_group)
-        layout.addLayout(button_layout)
         layout.addWidget(pipeline_group)
-        self.setLayout(layout)
+
+    # ------------------------------------------------------------------ compile
 
     def compile(self):
         source = self.source_edit.toPlainText()
@@ -51,77 +68,107 @@ class PipelineTab(QWidget):
             return
 
         self.pipeline_tree.clear()
+        self.status_label.hide()
 
         root = QTreeWidgetItem(self.pipeline_tree)
-        root.setText(0, "Compilation Pipeline")
+        root.setText(0, "Compilation pipeline")
         root.setExpanded(True)
 
         error_handler = ErrorHandler()
 
-        lexer_item = QTreeWidgetItem(root)
-        lexer_item.setText(0, "1. Lexical Analysis")
-        lexer_item.setExpanded(True)
+        # ── Phase 1: Lexing ───────────────────────────────────────────────
+        lex_item = QTreeWidgetItem(root)
+        lex_item.setText(0, "1. Lexical analysis")
+        lex_item.setExpanded(True)
 
         tokens = tokenize(source, error_handler)
 
         if error_handler.has_errors():
-            lexer_item.setText(1, "FAILED")
-            lexer_item.setForeground(1, QBrush(QColor("#FF0000")))
+            self._mark(lex_item, False)
             for error in error_handler.get_errors():
-                err_item = QTreeWidgetItem(lexer_item)
-                err_item.setText(2, str(error))
+                self._add_detail(lex_item, str(error))
+            self._set_status(f"Stopped at lexical analysis — {len(error_handler.get_errors())} error(s).", error=True)
             return
-        else:
-            lexer_item.setText(1, "SUCCESS")
-            lexer_item.setForeground(1, QBrush(QColor("#00FF00")))
-            token_count_item = QTreeWidgetItem(lexer_item)
-            token_count_item.setText(2, f"Generated {len(tokens) - 1} tokens")
 
-        parser_item = QTreeWidgetItem(root)
-        parser_item.setText(0, "2. Syntax Analysis")
-        parser_item.setExpanded(True)
+        if self._highlighter:
+            self._highlighter.set_tokens(tokens)
+
+        self._mark(lex_item, True)
+        self._add_detail(lex_item, f"Generated {len(tokens) - 1} tokens")
+
+        # ── Phase 2: Parsing ──────────────────────────────────────────────
+        parse_item = QTreeWidgetItem(root)
+        parse_item.setText(0, "2. Syntax analysis")
+        parse_item.setExpanded(True)
 
         ast = parse(tokens, error_handler)
 
         if error_handler.has_errors():
-            parser_item.setText(1, "FAILED")
-            parser_item.setForeground(1, QBrush(QColor("#FF0000")))
+            self._mark(parse_item, False)
             for error in error_handler.get_errors():
-                err_item = QTreeWidgetItem(parser_item)
-                err_item.setText(2, str(error))
+                self._add_detail(parse_item, str(error))
+            self._set_status(f"Stopped at syntax analysis — {len(error_handler.get_errors())} error(s).", error=True)
             return
-        else:
-            parser_item.setText(1, "SUCCESS")
-            parser_item.setForeground(1, QBrush(QColor("#00FF00")))
-            stmt_count_item = QTreeWidgetItem(parser_item)
-            stmt_count_item.setText(2, f"Built AST with {len(ast.statements)} statements")
 
-        semantic_item = QTreeWidgetItem(root)
-        semantic_item.setText(0, "3. Semantic Analysis")
-        semantic_item.setExpanded(True)
+        self._mark(parse_item, True)
+        self._add_detail(parse_item, f"Built AST with {len(ast.statements)} statement(s)")
+
+        # ── Phase 3: Semantic analysis ────────────────────────────────────
+        sem_item = QTreeWidgetItem(root)
+        sem_item.setText(0, "3. Semantic analysis")
+        sem_item.setExpanded(True)
 
         analyzer = SemanticAnalyzer(error_handler)
         analyzer.analyze(ast)
 
         if error_handler.has_errors():
-            semantic_item.setText(1, "FAILED")
-            semantic_item.setForeground(1, QBrush(QColor("#FF0000")))
+            self._mark(sem_item, False)
             for error in error_handler.get_errors():
-                err_item = QTreeWidgetItem(semantic_item)
-                err_item.setText(2, str(error))
+                self._add_detail(sem_item, str(error))
+            self._set_status(f"Stopped at semantic analysis — {len(error_handler.get_errors())} error(s).", error=True)
+            return
+
+        total_symbols = sum(len(s) for s in analyzer.symbol_table.scopes)
+        self._mark(sem_item, True)
+        self._add_detail(
+            sem_item,
+            f"Checked {total_symbols} symbol(s) across {len(analyzer.symbol_table.scopes)} scope(s)"
+        )
+
+        # ── Done ──────────────────────────────────────────────────────────
+        done = QTreeWidgetItem(root)
+        done.setText(0, "Compilation complete")
+        done.setText(1, "SUCCESS")
+        done.setForeground(0, QBrush(QColor("#00cc66")))
+        done.setForeground(1, QBrush(QColor("#00cc66")))
+        self._set_status("Compilation successful — no errors.", error=False)
+
+    # ------------------------------------------------------------------ helpers
+
+    @staticmethod
+    def _mark(item: QTreeWidgetItem, ok: bool):
+        colour = QColor("#00cc66") if ok else QColor("#ff4444")
+        text   = "SUCCESS" if ok else "FAILED"
+        item.setText(1, text)
+        item.setForeground(1, QBrush(colour))
+
+    @staticmethod
+    def _add_detail(parent: QTreeWidgetItem, text: str):
+        child = QTreeWidgetItem(parent)
+        child.setText(2, text)
+
+    def _set_status(self, msg: str, error: bool):
+        if error:
+            style = ("background-color: #3a0000; color: #ff8080;"
+                     "padding: 6px; border-radius: 4px; font-family: Consolas;")
         else:
-            semantic_item.setText(1, "SUCCESS")
-            semantic_item.setForeground(1, QBrush(QColor("#00FF00")))
-            symbol_count_item = QTreeWidgetItem(semantic_item)
-            total_symbols = sum(len(scope) for scope in analyzer.symbol_table.scopes)
-            symbol_count_item.setText(2, f"Checked {total_symbols} symbols across {len(analyzer.symbol_table.scopes)} scope(s)")
+            style = ("background-color: #003a00; color: #80ff80;"
+                     "padding: 6px; border-radius: 4px; font-family: Consolas;")
+        self.status_label.setStyleSheet(style)
+        self.status_label.setText(msg)
+        self.status_label.show()
 
-        if not error_handler.has_errors():
-            success_item = QTreeWidgetItem(root)
-            success_item.setText(0, "Compilation Complete")
-            success_item.setText(1, "SUCCESS")
-            success_item.setForeground(1, QBrush(QColor("#00FF00")))
-            success_item.setForeground(0, QBrush(QColor("#00FF00")))
+    # ------------------------------------------------------------------ shared
 
-    def set_source(self, source):
+    def set_source(self, source: str):
         self.source_edit.setPlainText(source)
