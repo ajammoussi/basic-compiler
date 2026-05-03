@@ -16,7 +16,7 @@ from gui.tabs.pipeline_tab import PipelineTab
 class CompilerGUI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Basic Compiler — Interactive GUI")
+        self.setWindowTitle("Basic Compiler")
         self.setGeometry(100, 100, 1400, 900)
         self.setStyleSheet("""
             QMainWindow {
@@ -122,7 +122,7 @@ class CompilerGUI(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
 
         # Header
-        header = QLabel("Basic Compiler — Interactive Visualization")
+        header = QLabel("Basic Compiler")
         header.setStyleSheet("""
             QLabel {
                 font-size: 22px;
