@@ -113,6 +113,17 @@ class Lexer:
                         # Re-classify plain identifiers that are keywords
                         if token_type == TokenType.IDENTIFIER and token_text in KEYWORDS:
                             token_type = KEYWORDS[token_text]
+                        elif token_type == TokenType.IDENTIFIER:
+                            # Flag identifiers that look like misspelled keywords
+                            for kw in KEYWORDS:
+                                if token_text.startswith(kw) and len(token_text) > len(kw):
+                                    if self.error_handler:
+                                        self.error_handler.add_error(
+                                            f"Invalid identifier {token_text!r} "
+                                            f"(did you mean keyword {kw!r}?)",
+                                            self.line, self.column
+                                        )
+                                    break
                         token = Token(token_type, token_text, self.line, self.column)
                         self.tokens.append(token)
                     self._advance(token_text)
